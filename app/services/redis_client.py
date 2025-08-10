@@ -14,11 +14,20 @@ class RedisService:
     
     def __init__(self):
         self.client: Optional[redis.Redis] = None
-        self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        # self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.redis_url = os.getenv("REDIS_URL") or os.getenv("REDIS") or "redis://localhost:6379"
         
     async def initialize(self):
         """Initialize Redis connection"""
         try:
+            ssl_context = None
+
+            # If using rediss:// (SSL) on Heroku, disable cert verification
+            if self.redis_url.startswith("rediss://"):
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                
             self.client = redis.from_url(
                 self.redis_url,
                 decode_responses=False,  # Keep bytes for vector operations
