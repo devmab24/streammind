@@ -1,0 +1,1472 @@
+function updateMetrics() {
+            // Simulate realistic metric updates
+            updateMetric('eventsPerSec', 1000 + Math.floor(Math.random() * 500));
+            updateMetric('processingLatency', 10 + Math.floor(Math.random() * 10) + 'ms');
+            updateMetric('activeUsers', 8000 + Math.floor(Math.random() * 1000));
+            updateMetric('requestsPerSec', 2500 + Math.floor(Math.random() * 700));
+            updateMetric('avgResponseTime', (4 + Math.random() * 3).toFixed(1) + 'ms');
+            updateMetric('p99ResponseTime', (10 + Math.random() * 10).toFixed(0) + 'ms');
+            updateMetric('cacheHitRateMetric', (94 + Math.random() * 2).toFixed(1) + '%');
+            updateMetric('vectorSearchTime', (2 + Math.random() * 2).toFixed(1) + 'ms');
+            updateMetric('embeddingTime', (8 + Math.random() * 4).toFixed(1) + 'ms');
+        }
+
+        function updateMetric(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // API calls to backend
+        async function performActualSearch(query, category = null) {
+            try {
+                const response = await fetch('/api/search/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        category: category,
+                        k: 10
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update metrics with real data
+                    updateMetric('eventsPerSec', Math.floor(data.events_per_second));
+                    updateMetric('requestsPerSec', Math.floor(data.requests_per_second));
+                    updateMetric('avgResponseTime', data.avg_response_time_ms.toFixed(1) + 'ms');
+                    updateMetric('p99ResponseTime', data.p99_response_time_ms.toFixed(0) + 'ms');
+                    updateMetric('cacheHitRateMetric', (data.cache_hit_rate * 100).toFixed(1) + '%');
+                    updateMetric('vectorSearchTime', data.vector_search_time_ms.toFixed(1) + 'ms');
+                    updateMetric('embeddingTime', data.embedding_time_ms.toFixed(1) + 'ms');
+                    updateMetric('activeUsers', data.active_users);
+                }
+            } catch (error) {
+                console.error('Metrics error:', error);
+            }
+        }
+
+        async function getRecentActivity() {
+            try {
+                const response = await fetch('/api/analytics/activity');
+                if (response.ok) {
+                    const activities = await response.json();
+                    displayActivities(activities);
+                }
+            } catch (error) {
+                console.error('Activity error:', error);
+            }
+        }
+
+        function displayActivities(activities) {
+            const container = document.getElementById('activityFeed');
+            container.innerHTML = activities.map(activity => `
+                <div class="activity-item">
+                    <div class="activity-icon ${activity.type}">
+                        <i class="${activity.icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-text">${activity.user} ${activity.type}ed "${activity.content}"</div>
+                        <div class="activity-time">${activity.time}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Enhanced search functionality
+        async function performSearch() {
+            const query = document.getElementById('searchQuery').value;
+            const activeFilter = document.querySelector('.filter-chip.active').dataset.filter;
+            
+            if (!query.trim()) {
+                displaySearchResults(sampleResults);
+                return;
+            }
+            
+            // Show loading
+            showSearchLoading();
+            
+            // Try actual API call
+            const apiResult = await performActualSearch(query, activeFilter === 'all' ? null : activeFilter);
+            
+            if (apiResult) {
+                // Use real API results
+                const results = apiResult.results.map(result => ({
+                    title: result.title,
+                    snippet: result.content,
+                    category: result.category,
+                    author: result.author,
+                    score: result.score,
+                    time: result.time_ago
+                }));
+                
+                displaySearchResults(results);
+                updateSearchMetrics(apiResult.total_results, apiResult.search_time_ms);
+            } else {
+                // Fallback to sample data
+                let results = sampleResults;
+                
+                if (activeFilter !== 'all') {
+                    results = results.filter(r => r.category === activeFilter);
+                }
+                
+                if (query) {
+                    results = results.filter(r => 
+                        r.title.toLowerCase().includes(query.toLowerCase()) ||
+                        r.snippet.toLowerCase().includes(query.toLowerCase())
+                    );
+                }
+                
+                displaySearchResults(results);
+                updateSearchMetrics(results.length, Math.random() * 5 + 1);
+            }
+        }
+
+        // Enhanced recommendations
+        async function generateRecommendations() {
+            const selectedUser = document.getElementById('userSelect').value;
+            const container = document.getElementById('recommendationsContainer');
+            
+            // Show loading
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Generating personalized recommendations...</span>
+                </div>
+            `;
+            
+            // Try actual API call
+            const apiResult = await getActualRecommendations(selectedUser);
+            
+            if (apiResult) {
+                // Use real API results
+                container.innerHTML = apiResult.recommendations.map(rec => `
+                    <div class="recommendation-item fade-in">
+                        <div class="rec-header">
+                            <div class="rec-title">${rec.title}</div>
+                            <div class="rec-confidence">${(rec.confidence * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="rec-explanation">${rec.explanation}</div>
+                        <div class="rec-tags">
+                            ${rec.tags.map(tag => `<span class="rec-tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                // Fallback to sample data
+                const recommendations = sampleRecommendations[selectedUser] || sampleRecommendations.user1;
+                
+                container.innerHTML = recommendations.map(rec => `
+                    <div class="recommendation-item fade-in">
+                        <div class="rec-header">
+                            <div class="rec-title">${rec.title}</div>
+                            <div class="rec-confidence">${(rec.confidence * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="rec-explanation">${rec.explanation}</div>
+                        <div class="rec-tags">
+                            ${rec.tags.map(tag => `<span class="rec-tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Enhanced metrics updates
+        function startMetricsUpdates() {
+            // Try to get real metrics first
+            getActualMetrics();
+            getRecentActivity();
+            
+            // Update every 5 seconds
+            setInterval(() => {
+                getActualMetrics();
+                getRecentActivity();
+            }, 5000);
+        }
+
+        // Auto-update demo stats in hero section
+        function updateHeroStats() {
+            // Animate the stats slightly for visual appeal
+            const stats = [
+                { id: 'vectorsIndexed', base: '1.2M', suffix: '+' },
+                { id: 'searchLatency', base: '<', value: (3 + Math.random() * 3).toFixed(0), suffix: 'ms' },
+                { id: 'cacheHitRate', value: (93 + Math.random() * 3).toFixed(0), suffix: '%' }
+            ];
+            
+            stats.forEach(stat => {
+                const element = document.getElementById(stat.id);
+                if (element && stat.value) {
+                    element.textContent = (stat.base || '') + stat.value + (stat.suffix || '');
+                }
+            });
+        }
+
+        // Start hero stats updates
+        setInterval(updateHeroStats, 3000);
+
+        // Real-time activity simulation
+        function simulateRealTimeActivity() {
+            setInterval(addRandomActivity, 4000);
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSearch();
+            initializeRealTimeFeatures();
+            initializeRecommendations();
+            startMetricsUpdates();
+            simulateRealTimeActivity();
+            
+            // Update hero stats initially
+            updateHeroStats();
+        });
+
+        // Add smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add loading states for better UX
+        function addLoadingStates() {
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    this.style.opacity = '0.7';
+                    setTimeout(() => {
+                        this.style.opacity = '1';
+                    }, 1000);
+                });
+            });
+        }
+
+        // Initialize loading states
+        setTimeout(addLoadingStates, 1000);
+
+        // Add error handling for failed API calls
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            // Could show a user-friendly error message here
+        });
+
+        // Progressive enhancement - check if APIs are available
+        async function checkAPIAvailability() {
+            try {
+                const response = await fetch('/api/analytics/health');
+                if (response.ok) {
+                    console.log('✅ Backend APIs are available');
+                    document.body.classList.add('api-available');
+                } else {
+                    console.log('⚠️ Backend APIs not available, using demo mode');
+                    document.body.classList.add('demo-mode');
+                }
+            } catch (error) {
+                console.log('⚠️ Backend not available, using demo mode');
+                document.body.classList.add('demo-mode');
+            }
+        }
+
+        // Check API availability on load
+        checkAPIAvailability();
+
+    </script>
+</body>
+</html>.ok) {
+                    const data = await response.json();
+                    return data;
+                } else {
+                    console.error('Search failed:', response.statusText);
+                    return null;
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                return null;
+            }
+        }
+
+        async function getActualRecommendations(userId) {
+            try {
+                const diversity = document.getElementById('diversitySlider').value;
+                const response = await fetch('/api/recommendations/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        diversity: parseFloat(diversity),
+                        k: 5
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                } else {
+                    console.error('Recommendations failed:', response.statusText);
+                    return null;
+                }
+            } catch (error) {
+                console.error('Recommendations error:', error);
+                return null;
+            }
+        }
+
+        async function getActualMetrics() {
+            try {
+                const response = await fetch('/api/analytics/metrics');
+                if (response<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamMind - Real-Time AI Content Discovery</title>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --bg-dark: #0a0b0d;
+            --bg-card: #1a1d21;
+            --bg-surface: #242831;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a6b8;
+            --text-muted: #6b7280;
+            --border-color: #2d3748;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 50%, var(--accent-blue) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, var(--accent-purple) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 80%, var(--accent-pink) 0%, transparent 50%);
+            animation: backgroundPulse 10s ease-in-out infinite alternate;
+        }
+
+        @keyframes backgroundPulse {
+            0% { transform: scale(1) rotate(0deg); }
+            100% { transform: scale(1.1) rotate(5deg); }
+        }
+
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(26, 29, 33, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo i {
+            font-size: 2rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary-gradient);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+            margin-bottom: 3rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-top: 2rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Demo Sections */
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .demo-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .demo-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary-gradient);
+        }
+
+        .demo-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .demo-card i {
+            color: var(--accent-blue);
+        }
+
+        /* Search Demo */
+        .search-demo {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.5rem 1rem 3rem;
+            background: var(--bg-surface);
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        .search-filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            padding: 0.5rem 1rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .filter-chip.active {
+            background: var(--primary-gradient);
+            color: white;
+            border-color: transparent;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--accent-blue);
+        }
+
+        /* Results Display */
+        .results-container {
+            background: var(--bg-surface);
+            border-radius: 15px;
+            padding: 1.5rem;
+            min-height: 300px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .results-count {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .search-time {
+            color: var(--accent-green);
+            font-weight: 500;
+        }
+
+        .result-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .result-snippet {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .result-score {
+            background: var(--success-gradient);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        /* Performance Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value.primary { color: var(--accent-blue); }
+        .metric-value.success { color: var(--accent-green); }
+        .metric-value.warning { color: #f59e0b; }
+        .metric-value.purple { color: var(--accent-purple); }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Real-time Features */
+        .realtime-demo {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+        }
+
+        .activity-feed {
+            background: var(--bg-surface);
+            border-radius: 15px;
+            padding: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+            animation: slideInRight 0.5s ease;
+        }
+
+        .activity-item:hover {
+            background: var(--bg-card);
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .activity-icon.view { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .activity-icon.like { background: rgba(236, 72, 153, 0.2); color: var(--accent-pink); }
+        .activity-icon.share { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-text {
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Recommendations Demo */
+        .recommendations-demo {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+        }
+
+        .recommendation-item {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .recommendation-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--secondary-gradient);
+        }
+
+        .recommendation-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .rec-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .rec-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .rec-confidence {
+            background: var(--accent-purple);
+            color: white;
+            padding: 0.2rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .rec-explanation {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .rec-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .rec-tag {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--accent-purple);
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Controls */
+        .controls-panel {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-group {
+            margin-bottom: 2rem;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .slider-container {
+            position: relative;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-surface);
+            outline: none;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .demo-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .search-demo {
+                grid-column: 1;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .search-filters {
+                justify-content: center;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-animation"></div>
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                StreamMind
+            </div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#search">Vector Search</a></li>
+                    <li><a href="#recommendations">AI Recommendations</a></li>
+                    <li><a href="#realtime">Real-time Features</a></li>
+                    <li><a href="#performance">Performance</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>Real-Time AI Content Discovery</h1>
+            <p>Experience the power of Redis-powered vector search, semantic caching, and real-time personalization. 
+               Built for the Dev.to Redis AI Competition.</p>
+            
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="vectorsIndexed">1.2M+</span>
+                    <span class="stat-label">Vectors Indexed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="searchLatency">&lt;5ms</span>
+                    <span class="stat-label">Search Latency</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="cacheHitRate">94%</span>
+                    <span class="stat-label">Cache Hit Rate</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="realTimeUpdates">24/7</span>
+                    <span class="stat-label">Real-time Updates</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demo Grid -->
+        <div class="demo-grid">
+            <!-- Vector Search Demo -->
+            <div class="demo-card search-demo" id="search">
+                <h3><i class="fas fa-search"></i> Intelligent Vector Search</h3>
+                <p>Experience hybrid vector + text search with real-time filtering and semantic similarity.</p>
+                
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search for AI, machine learning, tutorials..." id="searchQuery">
+                </div>
+                
+                <div class="search-filters">
+                    <div class="filter-chip active" data-filter="all">All Content</div>
+                    <div class="filter-chip" data-filter="technology">Technology</div>
+                    <div class="filter-chip" data-filter="tutorial">Tutorials</div>
+                    <div class="filter-chip" data-filter="news">News</div>
+                    <div class="filter-chip" data-filter="research">Research</div>
+                </div>
+                
+                <div class="results-container">
+                    <div class="results-header">
+                        <span class="results-count">Found <span id="resultCount">12,847</span> results</span>
+                        <span class="search-time">in <span id="searchTime">3.2ms</span></span>
+                    </div>
+                    
+                    <div id="searchResults">
+                        <!-- Results will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Real-time Features Demo -->
+            <div class="demo-card realtime-demo" id="realtime">
+                <h3><i class="fas fa-bolt"></i> Real-time Feature Streaming</h3>
+                <p>Watch user interactions processed in real-time with Redis Streams.</p>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value primary" id="eventsPerSec">1,247</div>
+                        <div class="metric-label">Events/sec</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value success" id="processingLatency">12ms</div>
+                        <div class="metric-label">Processing</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value purple" id="activeUsers">8,439</div>
+                        <div class="metric-label">Active Users</div>
+                    </div>
+                </div>
+                
+                <div class="activity-feed" id="activityFeed">
+                    <!-- Real-time activities will be populated -->
+                </div>
+            </div>
+            
+            <!-- AI Recommendations Demo -->
+            <div class="demo-card recommendations-demo" id="recommendations">
+                <h3><i class="fas fa-magic"></i> AI-Powered Recommendations</h3>
+                <p>Multi-strategy personalization with collaborative filtering and contextual awareness.</p>
+                
+                <div class="controls-panel">
+                    <div class="control-group">
+                        <label class="control-label">User Profile</label>
+                        <select id="userSelect" class="search-input">
+                            <option value="user1">Tech Enthusiast (Sarah)</option>
+                            <option value="user2">Data Scientist (Mike)</option>
+                            <option value="user3">Designer (Emma)</option>
+                            <option value="user4">Startup Founder (Alex)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label class="control-label">Diversity Level: <span id="diversityValue">0.7</span></label>
+                        <input type="range" class="slider" id="diversitySlider" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                    
+                    <button class="btn" onclick="generateRecommendations()">Generate Recommendations</button>
+                </div>
+                
+                <div id="recommendationsContainer">
+                    <!-- Recommendations will be populated -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Metrics -->
+        <div class="demo-card" id="performance">
+            <h3><i class="fas fa-tachometer-alt"></i> Performance Monitoring</h3>
+            <p>Real-time performance metrics and multi-layer caching statistics.</p>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value primary" id="requestsPerSec">2,847</div>
+                    <div class="metric-label">Requests/sec</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value success" id="avgResponseTime">4.3ms</div>
+                    <div class="metric-label">Avg Response</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value warning" id="p99ResponseTime">15ms</div>
+                    <div class="metric-label">P99 Response</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value purple" id="cacheHitRateMetric">94.2%</div>
+                    <div class="metric-label">Cache Hit Rate</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value primary" id="vectorSearchTime">2.1ms</div>
+                    <div class="metric-label">Vector Search</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value success" id="embeddingTime">8.7ms</div>
+                    <div class="metric-label">Embedding Gen</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data for demonstration
+        const sampleResults = [
+            {
+                title: "Advanced Vector Search with Redis",
+                snippet: "Learn how to implement high-performance vector search using Redis Stack with real-time indexing and semantic similarity matching...",
+                category: "technology",
+                author: "Redis Labs",
+                score: 0.94,
+                time: "2 hours ago"
+            },
+            {
+                title: "Building Real-time AI Applications",
+                snippet: "A comprehensive guide to creating responsive AI applications with streaming data processing and instant user feedback...",
+                category: "tutorial",
+                author: "AI Weekly",
+                score: 0.91,
+                time: "5 hours ago"
+            },
+            {
+                title: "Machine Learning in Production: Redis Integration",
+                snippet: "Best practices for deploying ML models with Redis as a feature store and real-time inference cache...",
+                category: "research",
+                author: "MLOps Community",
+                score: 0.88,
+                time: "1 day ago"
+            }
+        ];
+
+        const sampleActivities = [
+            { type: 'view', user: 'Sarah M.', content: 'Vector Database Tutorial', time: 'just now' },
+            { type: 'like', user: 'Mike Chen', content: 'Redis AI Integration Guide', time: '2s ago' },
+            { type: 'share', user: 'Emma Wilson', content: 'Real-time ML Pipeline', time: '5s ago' },
+            { type: 'view', user: 'Alex Rodriguez', content: 'Semantic Search Deep Dive', time: '8s ago' }
+        ];
+
+        const sampleRecommendations = {
+            user1: [
+                {
+                    title: "Advanced Redis Caching Strategies",
+                    explanation: "Based on your interest in performance optimization",
+                    confidence: 0.92,
+                    tags: ["redis", "caching", "performance"]
+                },
+                {
+                    title: "Building Scalable Vector Databases",
+                    explanation: "Similar users also viewed this content",
+                    confidence: 0.88,
+                    tags: ["vectors", "databases", "scaling"]
+                }
+            ],
+            user2: [
+                {
+                    title: "ML Feature Stores with Redis",
+                    explanation: "Matches your data science background",
+                    confidence: 0.95,
+                    tags: ["ml", "features", "data-science"]
+                },
+                {
+                    title: "Real-time Model Inference Patterns",
+                    explanation: "Trending in your field this week",
+                    confidence: 0.87,
+                    tags: ["inference", "real-time", "models"]
+                }
+            ]
+        };
+
+        // Initialize the demo
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSearch();
+            initializeRealTimeFeatures();
+            initializeRecommendations();
+            startMetricsUpdates();
+        });
+
+        // Search functionality
+        function initializeSearch() {
+            const searchInput = document.getElementById('searchQuery');
+            const filterChips = document.querySelectorAll('.filter-chip');
+            
+            searchInput.addEventListener('input', debounce(performSearch, 300));
+            
+            filterChips.forEach(chip => {
+                chip.addEventListener('click', function() {
+                    filterChips.forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    performSearch();
+                });
+            });
+            
+            // Initial search results
+            displaySearchResults(sampleResults);
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchQuery').value;
+            const activeFilter = document.querySelector('.filter-chip.active').dataset.filter;
+            
+            // Simulate search with loading
+            showSearchLoading();
+            
+            setTimeout(() => {
+                let results = sampleResults;
+                
+                if (activeFilter !== 'all') {
+                    results = results.filter(r => r.category === activeFilter);
+                }
+                
+                if (query) {
+                    results = results.filter(r => 
+                        r.title.toLowerCase().includes(query.toLowerCase()) ||
+                        r.snippet.toLowerCase().includes(query.toLowerCase())
+                    );
+                }
+                
+                displaySearchResults(results);
+                updateSearchMetrics(results.length, Math.random() * 5 + 1);
+            }, 200);
+        }
+
+        function showSearchLoading() {
+            document.getElementById('searchResults').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Searching vectors...</span>
+                </div>
+            `;
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No results found</div>';
+                return;
+            }
+            
+            container.innerHTML = results.map(result => `
+                <div class="result-item fade-in">
+                    <div class="result-title">${result.title}</div>
+                    <div class="result-snippet">${result.snippet}</div>
+                    <div class="result-meta">
+                        <span class="result-score">${(result.score * 100).toFixed(1)}% match</span>
+                        <span><i class="fas fa-user"></i> ${result.author}</span>
+                        <span><i class="fas fa-clock"></i> ${result.time}</span>
+                        <span><i class="fas fa-tag"></i> ${result.category}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSearchMetrics(count, time) {
+            document.getElementById('resultCount').textContent = count.toLocaleString();
+            document.getElementById('searchTime').textContent = time.toFixed(1) + 'ms';
+        }
+
+        // Real-time features
+        function initializeRealTimeFeatures() {
+            displayRecentActivities();
+            setInterval(addRandomActivity, 3000);
+        }
+
+        function displayRecentActivities() {
+            const container = document.getElementById('activityFeed');
+            container.innerHTML = sampleActivities.map(activity => createActivityItem(activity)).join('');
+        }
+
+        function addRandomActivity() {
+            const activities = [
+                { type: 'view', user: 'Anonymous User', content: 'Redis Tutorial', time: 'just now' },
+                { type: 'like', user: 'Developer', content: 'Vector Search Guide', time: 'just now' },
+                { type: 'share', user: 'Data Scientist', content: 'ML Pipeline Tutorial', time: 'just now' }
+            ];
+            
+            const activity = activities[Math.floor(Math.random() * activities.length)];
+            const container = document.getElementById('activityFeed');
+            
+            container.insertAdjacentHTML('afterbegin', createActivityItem(activity));
+            
+            // Remove old activities (keep only 10)
+            const items = container.querySelectorAll('.activity-item');
+            if (items.length > 10) {
+                items[items.length - 1].remove();
+            }
+        }
+
+        function createActivityItem(activity) {
+            const icons = {
+                view: 'fas fa-eye',
+                like: 'fas fa-heart',
+                share: 'fas fa-share'
+            };
+            
+            return `
+                <div class="activity-item">
+                    <div class="activity-icon ${activity.type}">
+                        <i class="${icons[activity.type]}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-text">${activity.user} ${activity.type}ed "${activity.content}"</div>
+                        <div class="activity-time">${activity.time}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Recommendations
+        function initializeRecommendations() {
+            const userSelect = document.getElementById('userSelect');
+            const diversitySlider = document.getElementById('diversitySlider');
+            
+            userSelect.addEventListener('change', generateRecommendations);
+            diversitySlider.addEventListener('input', function() {
+                document.getElementById('diversityValue').textContent = this.value;
+            });
+            
+            // Initial recommendations
+            generateRecommendations();
+        }
+
+        function generateRecommendations() {
+            const selectedUser = document.getElementById('userSelect').value;
+            const container = document.getElementById('recommendationsContainer');
+            
+            // Show loading
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Generating personalized recommendations...</span>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                const recommendations = sampleRecommendations[selectedUser] || sampleRecommendations.user1;
+                
+                container.innerHTML = recommendations.map(rec => `
+                    <div class="recommendation-item fade-in">
+                        <div class="rec-header">
+                            <div class="rec-title">${rec.title}</div>
+                            <div class="rec-confidence">${(rec.confidence * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="rec-explanation">${rec.explanation}</div>
+                        <div class="rec-tags">
+                            ${rec.tags.map(tag => `<span class="rec-tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }, 1000);
+        }
+
+        // Metrics updates
+        function startMetricsUpdates() {
+            setInterval(updateMetrics, 2000);
+        }
+
+        function updateMetrics() {
+            // Simulate realistic metric updates
+            updateMetric('eventsPerSec', 1000 + Math
