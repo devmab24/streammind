@@ -1,4 +1,121 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection App</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="./static/mywebscript.js"></script>
+    <style>
+        .center-heading {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .main-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .input-section {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .result-section {
+            min-height: 100px;
+        }
+        .form-control {
+            border-radius: 5px;
+            border: 2px solid #e9ecef;
+        }
+        .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        }
+        .btn-analyze {
+            background-color: #007bff;
+            border-color: #007bff;
+            padding: 10px 30px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        .btn-analyze:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="card shadow">
+            <div class="card-body">
+                <h1 class="center-heading">🧠 NLP - Emotion Detection</h1>
+                
+                <div class="input-section">
+                    <div class="form-group">
+                        <label for="textToAnalyze" class="form-label h5">Please enter the text to be analyzed:</label>
+                        <textarea 
+                            class="form-control" 
+                            id="textToAnalyze" 
+                            rows="4" 
+                            placeholder="Type your text here... (e.g., 'I am so happy today!')"
+                            maxlength="500"></textarea>
+                        <small class="form-text text-muted">Maximum 500 characters</small>
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <button onclick="RunSentimentAnalysis()" class="btn btn-primary btn-analyze">
+                            🔍 Analyze Emotions
+                        </button>
+                    </div>
+                </div>
+
+                <div class="result-section">
+                    <h4 class="mb-3">📊 Analysis Results:</h4>
+                    <div id="system_response" class="border rounded p-3" style="background-color: #f8f9fa; min-height: 80px;">
+                        <em class="text-muted">Results will appear here after analysis...</em>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                This app uses Watson NLP to detect emotions in text including anger, disgust, fear, joy, and sadness.
+            </small>
+        </div>
+    </div>
+
+    <script>
+        // Add enter key support for textarea
+        document.getElementById('textToAnalyze').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                RunSentimentAnalysis();
+            }
+        });
+
+        // Add character counter
+        document.getElementById('textToAnalyze').addEventListener('input', function(e) {
+            const maxLength = 500;
+            const currentLength = e.target.value.length;
+            const remaining = maxLength - currentLength;
+            
+            let helpText = document.querySelector('.form-text');
+            if (remaining < 50) {
+                helpText.innerHTML = `${remaining} characters remaining`;
+                helpText.className = 'form-text text-warning';
+            } else {
+                helpText.innerHTML = 'Maximum 500 characters';
+                helpText.className = 'form-text text-muted';
+            }
+        });
+    </script>
+</body>
+</html>
+
+<!-- <html>
 <head>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <script src="./static/mywebscript.js"></script>
@@ -29,4 +146,4 @@
             <div id="system_response" style="padding: 25px 25px 25px 25px;"></div>
         </div>
     </div>
-</body>
+</body> -->
